@@ -11,7 +11,7 @@ var defaults = {
   viewportHeight: 568, // not now used; TODO: need for different units and math for different properties
   unitPrecision: 5,
   viewportUnit: 'vw',
-  fontViewportUnit: 'vw',  // vmin is more suitable.
+  fontViewportUnit: 'vw', // vmin is more suitable.
   selectorBlackList: [],
   propList: ['*'],
   minPixelValue: 1,
@@ -22,16 +22,16 @@ var defaults = {
   landscapeWidth: 568
 };
 
-module.exports = postcss.plugin('postcss-px-to-viewport', function (options) {
-  
+module.exports = postcss.plugin('postcss-px-to-viewport', function(options) {
+
   var opts = objectAssign({}, defaults, options);
 
   var pxRegex = getUnitRegexp(opts.unitToConvert);
   var satisfyPropList = createPropListMatcher(opts.propList);
   var landscapeRules = [];
-  
-  return function (css) {
-    css.walkRules(function (rule) {
+
+  return function(css) {
+    css.walkRules(function(rule) {
       // Add exclude option to ignore some files like 'node_modules'
       var file = rule.source && rule.source.input.file;
 
@@ -46,7 +46,7 @@ module.exports = postcss.plugin('postcss-px-to-viewport', function (options) {
           throw new Error('options.exclude should be RegExp or Array.');
         }
       }
-      
+
       if (blacklistedSelector(opts.selectorBlackList, rule.selector)) return;
 
       if (opts.landscape && !rule.parent.params) {
@@ -55,19 +55,19 @@ module.exports = postcss.plugin('postcss-px-to-viewport', function (options) {
         rule.walkDecls(function(decl) {
           if (decl.value.indexOf(opts.unitToConvert) === -1) return;
           if (!satisfyPropList(decl.prop)) return;
-          
+
           landscapeRule.append(decl.clone({
             value: decl.value.replace(pxRegex, createPxReplace(opts, opts.landscapeUnit, opts.landscapeWidth))
           }));
         });
-        
+
         if (landscapeRule.nodes.length > 0) {
-          landscapeRules.push(landscapeRule); 
+          landscapeRules.push(landscapeRule);
         }
       }
 
       if (!validateParams(rule.parent.params, opts.mediaQuery)) return;
-      
+
       rule.walkDecls(function(decl, i) {
         if (decl.value.indexOf(opts.unitToConvert) === -1) return;
         if (!satisfyPropList(decl.prop)) return;
@@ -75,7 +75,7 @@ module.exports = postcss.plugin('postcss-px-to-viewport', function (options) {
         var unit;
         var size;
         var params = rule.parent.params;
-        
+
         if (opts.landscape && params && params.indexOf('landscape') !== -1) {
           unit = opts.landscapeUnit;
           size = opts.landscapeWidth;
@@ -83,11 +83,20 @@ module.exports = postcss.plugin('postcss-px-to-viewport', function (options) {
           unit = getUnit(decl.prop, opts);
           size = opts.viewportWidth;
         }
-        
+
+        // ylj增加对其他Ui组件库的特殊适配
+        if (opts.customViewportWidth && opts.customViewportWidth.length > 0) {
+          var obj = opts.customViewportWidth.find(item => isExclude(item.path, file));
+
+          if (obj) {
+            size = obj.viewportWidth;
+          }
+        }
+
         var value = decl.value.replace(pxRegex, createPxReplace(opts, unit, size));
-        
+
         if (declarationExists(decl.parent, decl.prop, value)) return;
-        
+
         if (opts.replace) {
           decl.value = value;
         } else {
@@ -95,10 +104,10 @@ module.exports = postcss.plugin('postcss-px-to-viewport', function (options) {
         }
       });
     });
-    
+
     if (landscapeRules.length > 0) {
       var landscapeRoot = new postcss.atRule({ params: '(orientation: landscape)', name: 'media' });
-      
+
       landscapeRules.forEach(function(rule) {
         landscapeRoot.append(rule);
       });
@@ -112,7 +121,7 @@ function getUnit(prop, opts) {
 }
 
 function createPxReplace(opts, viewportUnit, viewportSize) {
-  return function (m, $1) {
+  return function(m, $1) {
     if (!$1) return m;
     var pixels = parseFloat($1);
     if (pixels <= opts.minPixelValue) return m;
@@ -129,7 +138,7 @@ function toFixed(number, precision) {
 
 function blacklistedSelector(blacklist, selector) {
   if (typeof selector !== 'string') return;
-  return blacklist.some(function (regex) {
+  return blacklist.some(function(regex) {
     if (typeof regex === 'string') return selector.indexOf(regex) !== -1;
     return selector.match(regex);
   });
@@ -143,8 +152,8 @@ function isExclude(reg, file) {
 }
 
 function declarationExists(decls, prop, value) {
-  return decls.some(function (decl) {
-      return (decl.prop === prop && decl.value === value);
+  return decls.some(function(decl) {
+    return (decl.prop === prop && decl.value === value);
   });
 }
 
